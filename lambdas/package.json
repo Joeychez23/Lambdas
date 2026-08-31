@@ -1,0 +1,13 @@
+{
+	"name": "lambda-local-enviroment",
+	"version": "1.0.0",
+	"scripts": {
+	  "start": "serve public"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"dependencies": {
+	  "serve": "^14.2.1"
+	}
+  }

@@ -1,0 +1,10 @@
+[build]
+  command = "# no build command needed; it’s just HTML!"
+  functions = "functions/chess/"
+  publish = "public"
+
+
+[dev]
+  command = "npm start"  #=> command to start your dev server
+  publish = "public"    #=> where your static files live
+  port = 3003          #=> where Netlify Dev runs

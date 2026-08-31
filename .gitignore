@@ -1,0 +1,14 @@
+*.zip
+*.tfstate
+*.terraform
+*.hcl
+*.backup
+node_modules
+.netlify
+*.txt
+workbench.js
+.env
+lambdas/functions/user
+!.gitlab-ci.txt
+workbench
+!.env.zip

@@ -47,8 +47,8 @@ exports.handler = async (req) => {
 					opponentColor = "w"
 				}
 
-				if (response.game_data.white_player_id.S == "SINCLAIR_CHESS_AI") { ai = true; }
-				else if (response.game_data.black_player_id.S == "SINCLAIR_CHESS_AI") { ai = true; }
+				if (response.game_data.white_player_id.S == "CHESS_AI") { ai = true; }
+				else if (response.game_data.black_player_id.S == "CHESS_AI") { ai = true; }
 				else { ai = false; }
 
 				if (response.game_data && playerColor) {
@@ -87,8 +87,8 @@ exports.handler = async (req) => {
 				let response = await processMove(reqData); // POST OR GET -> VALIDATE -> PUT
 
 				let ai;
-				if (response.game_data.white_player_id.S == "SINCLAIR_CHESS_AI") { ai = true; }
-				else if (response.game_data.black_player_id.S == "SINCLAIR_CHESS_AI") { ai = true; }
+				if (response.game_data.white_player_id.S == "CHESS_AI") { ai = true; }
+				else if (response.game_data.black_player_id.S == "CHESS_AI") { ai = true; }
 				else { ai = false; }
 
 				if (response.game_data) { // REQUEST PROCESSED

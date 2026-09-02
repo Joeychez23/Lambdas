@@ -57,7 +57,7 @@ async function initalizeGame(existingGameId, playerId1, playerId2, createdBy) {
 	}).promise();
 
 	async function handleUser(userId) {
-		if (userId != "SINCLAIR_CHESS_AI") {
+		if (userId != "CHESS_AI") {
 			response = await retrieveUser(userId);
 			if (response.status == 500) { response = await initalizeUser(userId); }
 

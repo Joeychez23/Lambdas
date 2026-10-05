@@ -8,7 +8,7 @@ node_modules
 *.txt
 workbench.js
 .env
-lambdas/functions/user
+# lambdas/functions/user
 !.gitlab-ci.txt
 workbench
 !.env.zip

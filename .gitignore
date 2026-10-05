@@ -12,3 +12,4 @@ workbench.js
 !.gitlab-ci.txt
 workbench
 !.env.zip
+package-lock.json

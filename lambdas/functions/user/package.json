@@ -1,0 +1,20 @@
+{
+  "name": "chess",
+  "version": "1.0.0",
+  "description": "",
+  "main": "chess.js",
+  "scripts": {
+    "test": "node index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "auth0-js": "^9.24.1",
+    "aws-sdk": "^2.1465.0",
+    "bson": "^6.1.0",
+    "buffer": "^6.0.3",
+    "chess.js": "^1.0.0-beta.6",
+    "dotenv": "^16.3.1"
+  }
+}

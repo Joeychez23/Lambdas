@@ -32,21 +32,39 @@ async function initalizeGame(existingGameId, playerId1, playerId2, createdBy) {
 	let response;
 	if (existingGameId) { gameId = existingGameId; }
 	else { gameId = `${new ObjectId()}`; } // CREATES UNIQUE GAME IDENTIFIER
-
-	const params = {
-		TableName: "lakeside_chess_db",
-		Item: {
-			game_id: { S: gameId },
-			state: { S: "OPEN" },
-			game_board: { S: board },
-			moves: { S: JSON.stringify([]) },
-			prev_move: { S: JSON.stringify([]) },
-			w_knight: { S: JSON.stringify([{ from: null, to: 'b1' }, { from: null, to: 'g1' }]) },
-			b_knight: { S: JSON.stringify([{ from: null, to: 'b8' }, { from: null, to: 'g8' }]) },
-			white_player_id: { S: playerId1 },
-			black_player_id: { S: playerId2 }
-		}
-	};
+	let params;
+	if (playerId1 == "GUEST_USER" || playerId2 == "GUEST_USER") {
+		params = {
+			TableName: "lakeside_chess_db",
+			Item: {
+				game_id: { S: gameId },
+				state: { S: "OPEN" },
+				game_board: { S: board },
+				moves: { S: JSON.stringify([]) },
+				prev_move: { S: JSON.stringify([]) },
+				w_knight: { S: JSON.stringify([{ from: null, to: 'b1' }, { from: null, to: 'g1' }]) },
+				b_knight: { S: JSON.stringify([{ from: null, to: 'b8' }, { from: null, to: 'g8' }]) },
+				white_player_id: { S: playerId1 },
+				black_player_id: { S: playerId2 },
+				expireAt: { N: (Date.now() + (432000000 * 5)) }
+			}
+		};
+	} else {
+		params = {
+			TableName: "lakeside_chess_db",
+			Item: {
+				game_id: { S: gameId },
+				state: { S: "OPEN" },
+				game_board: { S: board },
+				moves: { S: JSON.stringify([]) },
+				prev_move: { S: JSON.stringify([]) },
+				w_knight: { S: JSON.stringify([{ from: null, to: 'b1' }, { from: null, to: 'g1' }]) },
+				b_knight: { S: JSON.stringify([{ from: null, to: 'b8' }, { from: null, to: 'g8' }]) },
+				white_player_id: { S: playerId1 },
+				black_player_id: { S: playerId2 }
+			}
+		};
+	}
 
 	await connection.putItem(params, function (err, data) { // POST REQUEST FOR GAME CREATION TO DYNAMODB
 		if (err) {

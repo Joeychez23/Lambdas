@@ -14,8 +14,8 @@ and Terraform.
 
 ```
 chess frontend (CloudFront) ──POST──▶ API Gateway /api/chess ──▶ lakeside-chess-lambda ──▶ DynamoDB
-                                                                         │                  lakeside_chess_db
-                                                                         │                  lakeside_user_db
+                                                                         │                  chess_db
+                                                                         │                  user_db
                                                                          └──▶ Auth0 Management API (find opponent by email)
 
 portfolio contact form ──────POST──▶ API Gateway /api/email ──▶ email-lambda ──▶ SES
@@ -73,16 +73,21 @@ is cleared.
 
 ### Data model
 
-Both tables are in **us-east-1** and aren't created by this Terraform. Every
-attribute is a string; arrays are stored as JSON.
+Both tables are in **us-east-1** and are managed by the Terraform in chess-frontend
+(`terraform/modules/dynamodb`), not this repo. Every
+attribute is a string (arrays are stored as JSON) except `expireAt`, a number in epoch
+seconds. `chess_db` has TTL on `expireAt`: it is set 25 days out when a game is
+created and pushed back on every move, so DynamoDB only deletes abandoned games.
 
 | Table | Key | Attributes |
 | --- | --- | --- |
-| `lakeside_chess_db` | `game_id` | `state`, `game_board` (FEN), `moves`, `prev_move`, `w_knight`, `b_knight`, `white_player_id`, `black_player_id` |
-| `lakeside_user_db` | `user_id` | `open_games`, `requested_games`, `closed_games` |
+| `chess_db` | `game_id` | `state`, `game_board` (FEN), `moves`, `prev_move`, `w_knight`, `b_knight`, `white_player_id`, `black_player_id`, `expireAt` |
+| `user_db` | `user_id` | `open_games`, `requested_games`, `closed_games` |
 
 A user row is created the first time that player is put into a game, and each
-new game is added to both players' `open_games`.
+new game is added to both players' `open_games` (`GUEST_USER` and `CHESS_AI` get
+no row). When a user's games are loaded, ids of games TTL has deleted are
+dropped from `open_games`.
 
 ## Deploy
 

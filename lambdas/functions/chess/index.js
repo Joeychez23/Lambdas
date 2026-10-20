@@ -9,7 +9,7 @@
 /* ---------------------------------------------------------------- */
 
 const { validateMove } = require("./validate/validate.js")
-const { initalizeGame, retrieveGame, updateGame, retrieveUser, auth0UserByEmail } = require('./dynamoDB/database-controller.js');
+const { initalizeGame, retrieveGame, updateGame, retrieveUser, pruneOpenGames, auth0UserByEmail } = require('./dynamoDB/database-controller.js');
 // const { sendToOpponentEmail } = require("./ses/email-controller.js");
 /* ---------------------------------------------------------------- */
 // lambda function
@@ -120,6 +120,7 @@ exports.handler = async (req) => {
 			} else if ( reqData.user_id ) {
 				const userId = reqData.user_id
 				let response = await retrieveUser(userId);
+				if (response.user_data) { response.user_data = await pruneOpenGames(response.user_data); } // DROPS EXPIRED GAMES BEFORE HOME LISTS THEM
 
 				if (response.user_data) { // REQUEST PROCESSED
 					let httpResponse = {

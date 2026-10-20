@@ -16,6 +16,22 @@ const { Chess } = require("chess.js");
 AWS.config.update({ region: "us-east-1" });
 const connection = new AWS.DynamoDB({ apiVersion: '2012-08-10' });
 
+const CHESS_TABLE = "chess_db"; // KEY: game_id (S), NAMES MATCH chess-frontend/terraform/aws-enviroment/locals.tf
+const USER_TABLE = "user_db"; // KEY: user_id (S)
+
+const GAME_TTL = 60 * 60 * 24 * 25; // GAMES EXPIRE 25 DAYS AFTER THE LAST MOVE (SECONDS)
+
+/* ---------------------------------------------------------------- */
+// Expire Time
+/* ---------------------------------------------------------------- */
+/**
+ * @description Builds the expireAt value DynamoDB TTL reads on chess_db
+ * @return {[string]} expireAt [epoch SECONDS as a string, the SDK rejects plain numbers for N]
+ */
+function expireTime() {
+	return `${Math.floor(Date.now() / 1000) + GAME_TTL}`;
+}
+
 /* ---------------------------------------------------------------- */
 // Initalize game (POST)
 /* ---------------------------------------------------------------- */
@@ -32,39 +48,21 @@ async function initalizeGame(existingGameId, playerId1, playerId2, createdBy) {
 	let response;
 	if (existingGameId) { gameId = existingGameId; }
 	else { gameId = `${new ObjectId()}`; } // CREATES UNIQUE GAME IDENTIFIER
-	let params;
-	if (playerId1 == "GUEST_USER" || playerId2 == "GUEST_USER") {
-		params = {
-			TableName: "lakeside_chess_db",
-			Item: {
-				game_id: { S: gameId },
-				state: { S: "OPEN" },
-				game_board: { S: board },
-				moves: { S: JSON.stringify([]) },
-				prev_move: { S: JSON.stringify([]) },
-				w_knight: { S: JSON.stringify([{ from: null, to: 'b1' }, { from: null, to: 'g1' }]) },
-				b_knight: { S: JSON.stringify([{ from: null, to: 'b8' }, { from: null, to: 'g8' }]) },
-				white_player_id: { S: playerId1 },
-				black_player_id: { S: playerId2 },
-				expireAt: { N: (Date.now() + (432000000 * 5)) }
-			}
-		};
-	} else {
-		params = {
-			TableName: "lakeside_chess_db",
-			Item: {
-				game_id: { S: gameId },
-				state: { S: "OPEN" },
-				game_board: { S: board },
-				moves: { S: JSON.stringify([]) },
-				prev_move: { S: JSON.stringify([]) },
-				w_knight: { S: JSON.stringify([{ from: null, to: 'b1' }, { from: null, to: 'g1' }]) },
-				b_knight: { S: JSON.stringify([{ from: null, to: 'b8' }, { from: null, to: 'g8' }]) },
-				white_player_id: { S: playerId1 },
-				black_player_id: { S: playerId2 }
-			}
-		};
-	}
+	let params = {
+		TableName: CHESS_TABLE,
+		Item: {
+			game_id: { S: gameId },
+			state: { S: "OPEN" },
+			game_board: { S: board },
+			moves: { S: JSON.stringify([]) },
+			prev_move: { S: JSON.stringify([]) },
+			w_knight: { S: JSON.stringify([{ from: null, to: 'b1' }, { from: null, to: 'g1' }]) },
+			b_knight: { S: JSON.stringify([{ from: null, to: 'b8' }, { from: null, to: 'g8' }]) },
+			white_player_id: { S: playerId1 },
+			black_player_id: { S: playerId2 },
+			expireAt: { N: expireTime() } // TTL, PUSHED BACK ON EVERY MOVE IN updateGame
+		}
+	};
 
 	await connection.putItem(params, function (err, data) { // POST REQUEST FOR GAME CREATION TO DYNAMODB
 		if (err) {
@@ -75,7 +73,7 @@ async function initalizeGame(existingGameId, playerId1, playerId2, createdBy) {
 	}).promise();
 
 	async function handleUser(userId) {
-		if (userId != "CHESS_AI") {
+		if (userId != "CHESS_AI" && userId != "GUEST_USER") { // GUESTS HAVE NO GAME LIST, SKIP THEM LIKE THE AI
 			response = await retrieveUser(userId);
 			if (response.status == 500) { response = await initalizeUser(userId); }
 
@@ -140,7 +138,7 @@ async function initalizeGame(existingGameId, playerId1, playerId2, createdBy) {
 async function retrieveGame(gameId) {
 	//ADD CHECK PLAYER ID TO RETURNED GAME
 	const params = {
-		TableName: "lakeside_chess_db",
+		TableName: CHESS_TABLE,
 		Key: {
 			game_id: { S: gameId } // SEARCH KEY
 		}
@@ -180,11 +178,11 @@ async function retrieveGame(gameId) {
  */
 async function updateGame(gameData) {
 	const params = {
-		TableName: "lakeside_chess_db",
+		TableName: CHESS_TABLE,
 		Key: {
 			game_id: { S: gameData.game_id.S }
 		},
-		UpdateExpression: 'SET moves = :moves, prev_move = :prev_move, game_board = :game_board, w_knight = :w_knight, b_knight = :b_knight', // WHAT IS BEING UPDATED, AND ASSOCIATED ATTRIBUTES TO WHAT THE DATA WILL BE
+		UpdateExpression: 'SET moves = :moves, prev_move = :prev_move, game_board = :game_board, w_knight = :w_knight, b_knight = :b_knight, expireAt = :expireAt', // WHAT IS BEING UPDATED, AND ASSOCIATED ATTRIBUTES TO WHAT THE DATA WILL BE
 		//, w_knight_2 = :w_knight_2', // WHAT IS BEING UPDATED, AND ASSOCIATED ATTRIBUTES TO WHAT THE DATA WILL BE
 
 		ExpressionAttributeValues: { // ASSOCIATED ATTRIBUTES
@@ -192,7 +190,8 @@ async function updateGame(gameData) {
 			":prev_move": { S: JSON.stringify(gameData.prev_move.S) },
 			":game_board": { S: gameData.game_board.S }, // UPDATED GAME FEN
 			":w_knight": { S: gameData.w_knight.S }, // UPDATED WHITE KNIGHT 1
-			":b_knight": { S: gameData.b_knight.S } // UPDATED BLACK KNIGHT 1
+			":b_knight": { S: gameData.b_knight.S }, // UPDATED BLACK KNIGHT 1
+			":expireAt": { N: expireTime() } // ACTIVE GAMES NEVER EXPIRE, ONLY ABANDONED ONES
 		}
 	}
 
@@ -237,7 +236,7 @@ async function updateGame(gameData) {
 async function initalizeUser(userId) {
 	//ADD CHECK PLAYER ID TO RETURNED GAME
 	const params = {
-		TableName: "lakeside_user_db",
+		TableName: USER_TABLE,
 		Item: {
 			user_id: { S: userId },
 			open_games: { S: JSON.stringify([]) },
@@ -280,7 +279,7 @@ async function initalizeUser(userId) {
 async function retrieveUser(userId) {
 	//ADD CHECK PLAYER ID TO RETURNED GAME
 	const params = {
-		TableName: "lakeside_user_db",
+		TableName: USER_TABLE,
 		Key: {
 			user_id: { S: userId } // SEARCH KEY
 		}
@@ -313,7 +312,7 @@ async function retrieveUser(userId) {
 
 async function updateUser(userData) {
 	const params = {
-		TableName: "lakeside_user_db",
+		TableName: USER_TABLE,
 		Key: {
 			user_id: { S: userData.user_id.S }
 		},
@@ -345,6 +344,70 @@ async function updateUser(userData) {
 			message: `User attributes failed to update: ${userData.user_id.S}`
 		}
 	}
+}
+
+/* ---------------------------------------------------------------- */
+// Prune open games
+/* ---------------------------------------------------------------- */
+/**
+ * @description Drops games TTL already deleted from a user's open_games & saves the shorter list
+ * @param  {[object]} userData [user item from retrieveUser]
+ * @return {[object]} userData [same item, open_games.S only lists games that still exist]
+ */
+async function pruneOpenGames(userData) {
+	const openGames = [...new Set(JSON.parse(userData.open_games.S))]; // BATCH GET FAILS ON DUPLICATE KEYS
+	if (openGames.length == 0) { return userData; }
+
+	let liveGames = [];
+	try {
+		for (let i = 0; i < openGames.length; i += 100) { // BATCH GET TAKES 100 KEYS MAX
+			const gameIds = openGames.slice(i, i + 100);
+			const params = {
+				RequestItems: {
+					[CHESS_TABLE]: {
+						Keys: gameIds.map((gameId) => ({ game_id: { S: gameId } })),
+						ProjectionExpression: "game_id" // ONLY CHECKING THE GAME EXISTS
+					}
+				}
+			};
+
+			const response = await connection.batchGetItem(params).promise();
+			const foundGames = response.Responses[CHESS_TABLE].map((game) => game.game_id.S);
+			const uncheckedGames = (response.UnprocessedKeys[CHESS_TABLE]?.Keys || []).map((key) => key.game_id.S);
+
+			for (let j = 0; j < gameIds.length; j++) {
+				if (foundGames.includes(gameIds[j]) || uncheckedGames.includes(gameIds[j])) { liveGames.push(gameIds[j]); } // UNCHECKED GAMES ARE KEPT, NEVER DROP A REAL GAME
+			}
+		}
+	} catch (err) {
+		console.log(`Open games check failed: ${err.message}`);
+		return userData; // SHOW THE LIST AS IS RATHER THAN BREAKING HOME
+	}
+
+	if (liveGames.length == openGames.length) { return userData; } // NOTHING EXPIRED
+
+	const prunedGames = JSON.stringify(liveGames);
+	const params = {
+		TableName: USER_TABLE,
+		Key: {
+			user_id: { S: userData.user_id.S }
+		},
+		UpdateExpression: 'SET open_games = :open_games',
+		ConditionExpression: 'open_games = :old_open_games', // SKIPS THE SAVE IF A GAME WAS ADDED MEANWHILE, NEXT LOAD PRUNES AGAIN
+		ExpressionAttributeValues: {
+			":open_games": { S: prunedGames },
+			":old_open_games": { S: userData.open_games.S }
+		}
+	}
+
+	try {
+		await connection.updateItem(params).promise(); // PUT REQUEST TO DYANMODB
+	} catch (err) {
+		if (err.code != "ConditionalCheckFailedException") { console.log(`Open games save failed: ${err.message}`); }
+	}
+
+	userData.open_games.S = prunedGames;
+	return userData;
 }
 
 
@@ -399,4 +462,4 @@ async function auth0UserByEmail(email) {
 }
 
 
-module.exports = { initalizeGame, retrieveGame, updateGame, initalizeUser, retrieveUser, updateUser, auth0UserByEmail }
+module.exports = { initalizeGame, retrieveGame, updateGame, initalizeUser, retrieveUser, updateUser, pruneOpenGames, auth0UserByEmail }

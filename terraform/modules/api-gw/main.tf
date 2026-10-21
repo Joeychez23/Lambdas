@@ -1,10 +1,10 @@
-module "chess_lambda" {
-  source      = "./lambda"
-  aws_region  = var.aws_region
-  lambda_name = var.lambda_name
-  handler     = var.handler
-  handler_dir = var.handler_dir
-}
+# module "chess_lambda" {
+#   source      = "./lambda"
+#   aws_region  = var.aws_region
+#   lambda_name = var.lambda_name
+#   handler     = var.handler
+#   handler_dir = var.handler_dir
+# }
 # module "auth0_lambda" {
 #   source      = "./lambda"
 #   aws_region  = var.aws_region
@@ -32,31 +32,36 @@ resource "aws_api_gateway_resource" "proxy_resource" {
   path_part   = var.api_route
 }
 
-resource "aws_api_gateway_resource" "chess_proxy_resource" {
-  depends_on  = [aws_api_gateway_rest_api.rest_api]
-  rest_api_id = aws_api_gateway_rest_api.rest_api.id
-  parent_id   = aws_api_gateway_resource.proxy_resource.id
-  path_part   = var.api_resource_name
-}
 
-resource "aws_api_gateway_method" "proxy_method" {
-  depends_on    = [aws_api_gateway_rest_api.rest_api]
-  rest_api_id   = aws_api_gateway_rest_api.rest_api.id
-  resource_id   = aws_api_gateway_resource.chess_proxy_resource.id
-  http_method   = "ANY"
-  authorization = "NONE"
-}
 
-resource "aws_api_gateway_integration" "proxy_integration" {
-  depends_on  = [aws_api_gateway_rest_api.rest_api]
-  rest_api_id = aws_api_gateway_rest_api.rest_api.id
-  resource_id = aws_api_gateway_method.proxy_method.resource_id
-  http_method = aws_api_gateway_method.proxy_method.http_method
 
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = module.chess_lambda.lambda_arn
-}
+// CHESS
+
+# resource "aws_api_gateway_resource" "chess_proxy_resource" {
+#   depends_on  = [aws_api_gateway_rest_api.rest_api]
+#   rest_api_id = aws_api_gateway_rest_api.rest_api.id
+#   parent_id   = aws_api_gateway_resource.proxy_resource.id
+#   path_part   = var.api_resource_name
+# }
+
+# resource "aws_api_gateway_method" "proxy_method" {
+#   depends_on    = [aws_api_gateway_rest_api.rest_api]
+#   rest_api_id   = aws_api_gateway_rest_api.rest_api.id
+#   resource_id   = aws_api_gateway_resource.chess_proxy_resource.id
+#   http_method   = "ANY"
+#   authorization = "NONE"
+# }
+
+# resource "aws_api_gateway_integration" "proxy_integration" {
+#   depends_on  = [aws_api_gateway_rest_api.rest_api]
+#   rest_api_id = aws_api_gateway_rest_api.rest_api.id
+#   resource_id = aws_api_gateway_method.proxy_method.resource_id
+#   http_method = aws_api_gateway_method.proxy_method.http_method
+
+#   integration_http_method = "POST"
+#   type                    = "AWS_PROXY"
+#   uri                     = module.chess_lambda.lambda_arn
+# }
 
 
 
@@ -140,8 +145,8 @@ resource "aws_api_gateway_deployment" "rest_api_deployment" {
   triggers = {
     redeployment = sha1(jsonencode([
       aws_api_gateway_resource.proxy_resource.id,
-      aws_api_gateway_method.proxy_method.id,
-      aws_api_gateway_integration.proxy_integration.id,
+      # aws_api_gateway_method.proxy_method.id,
+      # aws_api_gateway_integration.proxy_integration.id,
       # aws_api_gateway_method.auth0_proxy_method.id,
       # aws_api_gateway_integration.auth0_proxy_integration.id,
       aws_api_gateway_method.email_proxy_method.id,
@@ -161,15 +166,15 @@ resource "aws_api_gateway_stage" "rest_api_stage" {
 }
 
 
-resource "aws_lambda_permission" "chess_lambda_permission" {
-  depends_on    = [aws_api_gateway_rest_api.rest_api]
-  statement_id  = "allow-rest-api"
-  action        = "lambda:InvokeFunction"
-  function_name = module.chess_lambda.lambda_function_name
-  principal     = "apigateway.amazonaws.com"
-  # The /*/*/* part allows invocation from any stage, method and resource path within API Gateway REST API.
-  source_arn = "${aws_api_gateway_rest_api.rest_api.execution_arn}/*/*"
-}
+# resource "aws_lambda_permission" "chess_lambda_permission" {
+#   depends_on    = [aws_api_gateway_rest_api.rest_api]
+#   statement_id  = "allow-rest-api"
+#   action        = "lambda:InvokeFunction"
+#   function_name = module.chess_lambda.lambda_function_name
+#   principal     = "apigateway.amazonaws.com"
+#   # The /*/*/* part allows invocation from any stage, method and resource path within API Gateway REST API.
+#   source_arn = "${aws_api_gateway_rest_api.rest_api.execution_arn}/*/*"
+# }
 
 
 # resource "aws_lambda_permission" "auth0_lambda_permission" {
